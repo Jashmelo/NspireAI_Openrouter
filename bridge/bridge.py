@@ -122,7 +122,7 @@ CALCULATOR_SYSTEM_PROMPT = (
 
 
 class ChatCompletionsBackend:
-    """OpenAI-compatible chat.completions backend (DeepSeek and others)."""
+    """OpenAI-compatible chat.completions backend (OpenRouter and others)."""
 
     supports_effort = True
     supports_tools = True
@@ -149,10 +149,9 @@ class ChatCompletionsBackend:
     @staticmethod
     def _effort_kwargs(effort: Optional[str]) -> dict:
         if effort == "off":
-            return {"extra_body": {"thinking": {"type": "disabled"}}}
+            return {"extra_body": {"reasoning": {"effort": "none"}}}
         if effort in ("low", "high", "max"):
-            return {"reasoning_effort": effort,
-                    "extra_body": {"thinking": {"type": "enabled"}}}
+            return {"extra_body": {"reasoning": {"effort": effort}}}
         return {}
 
     def complete(self, messages: list[dict], effort: Optional[str] = None, tools=None,
@@ -208,11 +207,19 @@ class ChatCompletionsBackend:
                                          "arguments": call.function.arguments or "{}"}}
                            for call in calls],
         }
-        # DeepSeek's thinking mode rejects a tool round whose reasoning is
-        # not returned with it.
-        reasoning = getattr(message, "reasoning_content", None)
+        # OpenRouter returns reasoning details for some models. Preserve them
+        # across tool rounds so the selected free model keeps its reasoning
+        # context when tool results are submitted.
+        reasoning_details = getattr(message, "reasoning_details", None)
+        if reasoning_details is not None:
+            turn["reasoning_details"] = reasoning_details
+        reasoning = getattr(message, "reasoning", None)
         if reasoning is not None:
-            turn["reasoning_content"] = reasoning
+            turn["reasoning"] = reasoning
+        # Keep compatibility with providers that use the older field name.
+        reasoning_content = getattr(message, "reasoning_content", None)
+        if reasoning_content is not None:
+            turn["reasoning_content"] = reasoning_content
         return turn
 
     def answer(self, prompt: str, effort: Optional[str] = None) -> str:
@@ -300,18 +307,21 @@ class Bridge:
         return request_id
 
 
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEEPSEEK_DEFAULT_MODEL = "deepseek-v4-pro"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_DEFAULT_MODEL = "openrouter/free"
 
 
 def make_backend(name: str, model: str, api_key: Optional[str], base_url: Optional[str], timeout: float):
     if name == "echo":
         return EchoBackend()
-    if name == "deepseek":
+    if name == "openrouter":
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        if not openrouter_key:
+            raise RuntimeError("OPENROUTER_API_KEY is required for the OpenRouter backend")
         return ChatCompletionsBackend(
-            model=os.environ.get("DEEPSEEK_MODEL", DEEPSEEK_DEFAULT_MODEL),
-            api_key=os.environ.get("DEEPSEEK_API_KEY"),
-            base_url=os.environ.get("DEEPSEEK_BASE_URL", DEEPSEEK_BASE_URL),
+            model=os.environ.get("OPENROUTER_MODEL", OPENROUTER_DEFAULT_MODEL),
+            api_key=openrouter_key,
+            base_url=os.environ.get("OPENROUTER_BASE_URL", OPENROUTER_BASE_URL),
             timeout=timeout,
         )
     return OpenAIBackend(model=model, api_key=api_key, base_url=base_url, timeout=timeout)
@@ -336,7 +346,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--n-link-bin", default=os.environ.get("N_LINK_BIN", "n-link"))
     parser.add_argument("--remote-dir", default="/nspireai")
     parser.add_argument("--n-link-timeout", type=float, default=15.0)
-    parser.add_argument("--backend", choices=("echo", "openai", "deepseek"), default="echo")
+    parser.add_argument("--backend", choices=("echo", "openai", "openrouter"), default="echo")
     parser.add_argument("--model", default=os.environ.get("OPENAI_MODEL", "gpt-5"))
     parser.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL"))
     parser.add_argument("--api-timeout", type=float, default=float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "45")))

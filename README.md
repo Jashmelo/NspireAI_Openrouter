@@ -4,7 +4,7 @@
 > calculator is a thin terminal; the bridge host renders and remembers.
 >
 > **What it does**
-> - Chat with an LLM from the calculator (DeepSeek `deepseek-v4-pro`, OpenAI,
+> - Chat with an LLM from the calculator (OpenRouter `openrouter/free`, OpenAI,
 >   or an echo backend), with a thinking-effort switch (Var key).
 > - Answers are typeset: Markdown, LaTeX math and Chinese are rendered on the
 >   host into grayscale image blocks and shown on the page.
@@ -42,17 +42,18 @@
 > - While the page is open the calculator's file service pauses: deploy
 >   after closing the page (`scripts/page-cycle.sh` does it remotely).
 >
-> **Run it** (needs `~/.config/nspireai/env` with `DEEPSEEK_API_KEY=...`):
+> **Run it** (needs `~/.config/nspireai/env` with `OPENROUTER_API_KEY=...`):
 >
 > ```sh
-> cd ~/Documents/GitHub/NspireAI && ./scripts/run-navnet-bridge.sh deepseek
+> cd ~/Documents/GitHub/NspireAI_Openrouter && ./scripts/run-navnet-bridge.sh openrouter
 > ```
 >
 > Starting it again replaces a bridge that is already running (set
 > `NSPIREAI_NO_TAKEOVER=1` to refuse instead). Then open `nspire_ai` on the
 > calculator. The model gets no system prompt
-> (DeepSeek's own defaults apply; the page renders the Markdown and LaTeX it
-> writes); set `NSPIREAI_SYSTEM_PROMPT` in `~/.config/nspireai/env` to add one.
+> (the selected OpenRouter model's defaults apply; the page renders the
+> Markdown and LaTeX it writes); set `NSPIREAI_SYSTEM_PROMPT` in
+> `~/.config/nspireai/env` to add one.
 >
 > | Key | Action |
 > | --- | --- |
@@ -68,7 +69,7 @@
 > | ctrl + key | LaTeX symbols: `( )` → `{ }`, `÷` → `\`, `−` → `_`, `=` → `$` … |
 >
 > **Develop**: build with `scripts/build-marker-probe.sh`; redeploy and
-> reopen the page unattended with `scripts/page-cycle.sh [echo|deepseek]`;
+> reopen the page unattended with `scripts/page-cycle.sh [echo|openrouter]`;
 > drive and inspect the page with `scripts/pagectl.py` (`type`, `dump`,
 > `status`); host tests with `scripts/test-bridge.sh`.
 
@@ -281,8 +282,8 @@ not put it in a TNS file, source file, or log.
 
 ```sh
 mkdir -p ~/.config/nspireai
-printf 'DEEPSEEK_API_KEY=sk-...\n' > ~/.config/nspireai/env   # read by run-navnet-bridge.sh
-./scripts/run-navnet-bridge.sh deepseek                      # DEEPSEEK_MODEL defaults to deepseek-chat
+printf 'OPENROUTER_API_KEY=sk-or-v1-...\n' > ~/.config/nspireai/env  # read by run-navnet-bridge.sh
+./scripts/run-navnet-bridge.sh openrouter                    # OPENROUTER_MODEL defaults to openrouter/free
 ```
 
 Or with OpenAI:
@@ -293,9 +294,12 @@ export OPENAI_MODEL='gpt-5'
 ./scripts/run-navnet-bridge.sh openai
 ```
 
-`OPENAI_BASE_URL` and `OPENAI_TIMEOUT_SECONDS` are optional. The implementation
-uses the official Python SDK and the Responses API. Conversation history is
-kept on the Mac and is reset by the page’s “New conversation” action. Requests
+`OPENROUTER_MODEL` and `OPENROUTER_BASE_URL` are optional. The default model
+router, `openrouter/free`, selects an available free model compatible with each
+request. OpenRouter uses its OpenAI-compatible Chat Completions API through the
+official Python SDK. `OPENAI_BASE_URL` and `OPENAI_TIMEOUT_SECONDS` are optional
+for the separate OpenAI backend, which uses the Responses API. Conversation
+history is kept on the Mac and is reset by the page’s “New conversation” action. Requests
 carry a request ID and conversation ID; duplicates and late canceled responses
 are ignored. Model output is displayed as text and is never executed.
 
