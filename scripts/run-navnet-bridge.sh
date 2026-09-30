@@ -69,16 +69,16 @@ release_lock() {
 }
 trap release_lock EXIT
 
-if [[ "$BACKEND" != "echo" && "$BACKEND" != "openai" && "$BACKEND" != "deepseek" ]]; then
-  echo "usage: $0 [echo|openai|deepseek]" >&2
+if [[ "$BACKEND" != "echo" && "$BACKEND" != "openai" && "$BACKEND" != "openrouter" ]]; then
+  echo "usage: $0 [echo|openai|openrouter]" >&2
   exit 2
 fi
 if [[ ! -x "$PYTHON_BIN" ]]; then
   echo "bridge Python is missing; run ./scripts/setup-bridge-python.sh" >&2
   exit 2
 fi
-if [[ "$BACKEND" == "deepseek" && -z "${DEEPSEEK_API_KEY:-}" ]]; then
-  echo "DEEPSEEK_API_KEY is required for the DeepSeek backend" >&2
+if [[ "$BACKEND" == "openrouter" && -z "${OPENROUTER_API_KEY:-}" ]]; then
+  echo "OPENROUTER_API_KEY is required for the OpenRouter backend" >&2
   exit 2
 fi
 if [[ "$BACKEND" == "openai" && -z "${OPENAI_API_KEY:-}" ]]; then

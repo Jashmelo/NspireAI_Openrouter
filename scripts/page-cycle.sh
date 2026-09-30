@@ -2,7 +2,7 @@
 # Unattended redeploy cycle for the chat page:
 #   close the page (remote Esc) -> stop the bridge -> upload and verify ->
 #   start the bridge -> reopen the page (remote Enter) -> wait for HELLO.
-# Usage: page-cycle.sh [echo|deepseek|openai] [LOGFILE]
+# Usage: page-cycle.sh [echo|openrouter|openai] [LOGFILE]
 # Assumes nspire_ai is the selected entry in the calculator's file browser,
 # which is where the browser returns to after the page closes.
 set -uo pipefail

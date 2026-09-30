@@ -110,6 +110,28 @@ class BridgeEchoTests(unittest.TestCase):
 
 
 
+class OpenRouterBackendTests(unittest.TestCase):
+    def test_defaults_to_free_router(self):
+        from unittest.mock import patch
+        from bridge.bridge import ChatCompletionsBackend, make_backend
+
+        sentinel = object()
+        with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}, clear=True), \
+             patch("bridge.bridge.ChatCompletionsBackend", return_value=sentinel) as factory:
+            self.assertIs(make_backend("openrouter", "ignored", None, None, 12), sentinel)
+        factory.assert_called_once_with(
+            model="openrouter/free", api_key="test-key",
+            base_url="https://openrouter.ai/api/v1", timeout=12)
+
+    def test_requires_openrouter_key(self):
+        from unittest.mock import patch
+        from bridge.bridge import make_backend
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "OPENROUTER_API_KEY"):
+                make_backend("openrouter", "ignored", None, None, 12)
+
+
 class FakeCall:
     def __init__(self, identifier, name, arguments):
         self.id = identifier
@@ -117,11 +139,13 @@ class FakeCall:
 
 
 class FakeMessage:
-    def __init__(self, content=None, tool_calls=None, reasoning=None):
+    def __init__(self, content=None, tool_calls=None, reasoning=None, reasoning_details=None):
         self.content = content
         self.tool_calls = tool_calls
         if reasoning is not None:
             self.reasoning_content = reasoning
+        if reasoning_details is not None:
+            self.reasoning_details = reasoning_details
 
 
 class FakeCompletions:
@@ -183,7 +207,7 @@ class ToolLoopTests(unittest.TestCase):
         self.assertEqual(len(notes), 2)
         first, second = completions.requests
         self.assertEqual(first["tool_choice"], "auto")
-        self.assertEqual(first["reasoning_effort"], "high")
+        self.assertEqual(first["extra_body"]["reasoning"]["effort"], "high")
         self.assertEqual([tool["function"]["name"] for tool in first["tools"]],
                          ["web_search", "open_url"])
         self.assertIn("Today is 20", first["tools"][0]["function"]["description"])
@@ -197,6 +221,16 @@ class ToolLoopTests(unittest.TestCase):
             {"role": "tool", "tool_call_id": "c2", "content": "result 2"},
         ])
         self.assertEqual(self.QUESTION[-1], {"role": "user", "content": "news?"})  # not modified
+
+
+    def test_openrouter_reasoning_details_are_preserved(self):
+        details = [{"type": "reasoning.encrypted", "data": "opaque"}]
+        backend, completions = chat_backend([
+            FakeMessage("", [FakeCall("c1", "web_search", '{}')], reasoning_details=details),
+            FakeMessage("ok"),
+        ])
+        self.assertEqual(backend.complete(self.QUESTION, tools=FakeTools()), "ok")
+        self.assertEqual(completions.requests[1]["messages"][2]["reasoning_details"], details)
 
     def test_a_model_that_never_stops_searching_is_made_to_answer(self):
         from bridge.bridge import MAX_TOOL_ROUNDS
